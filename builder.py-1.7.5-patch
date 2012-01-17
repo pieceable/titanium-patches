@@ -1,0 +1,81 @@
+--- builder.py.orig	2011-10-28 15:50:36.000000000 -0700
++++ builder.py	2012-01-16 21:40:25.000000000 -0800
+@@ -466,6 +466,7 @@
+ 		print "  distribute    build final distribution bundle"
+ 		print "  xcode         build from within xcode"
+ 		print "  run           build and run app from project folder"
++		print "  buildfull     build complete simulator build"
+ 	
+ 		sys.exit(1)
+ 
+@@ -517,6 +518,11 @@
+ 			else:
+ 				# non-simulator + release build indicates package for distribution
+ 				deploytype = 'production'
++
++		# allow overrides
++		if 'DEPLOYTYPE' in os.environ:
++			deploytype = os.environ['DEPLOYTYPE']
++
+ 		compiler = Compiler(project_dir,appid,name,deploytype,xcode_build,devicefamily,iphone_version)
+ 		script_ok = True
+ 		sys.exit(0)
+@@ -603,6 +609,15 @@
+ 					debughost = None
+ 				else:
+ 					debughost,debugport = debughost.split(":")
++		elif command == "buildfull":
++			iphone_version = check_iphone_sdk(iphone_version)
++			link_version = iphone_version
++			print "[INFO] Switching to production mode for buildfull"
++			deploytype = 'production'
++			build_only = True
++			simulator = False
++			target = 'Debug'
++			ostype = 'simulator'
+ 		elif command == 'install':
+ 			iphone_version = check_iphone_sdk(iphone_version)
+ 			link_version = iphone_version
+@@ -751,7 +766,7 @@
+ 						custom_fonts.append(f)
+ 					
+ 
+-			if not simulator:
++			if not simulator and command != 'buildfull':
+ 				version = ti.properties['version']
+ 				# we want to make sure in debug mode the version always changes
+ 				version = "%s.%d" % (version,time.time())
+@@ -1188,7 +1203,7 @@
+ 				# build the final release distribution
+ 				args = []
+ 
+-				if command!='simulator':		
++				if command not in ['simulator', 'buildfull']:
+ 					# allow the project to have its own custom entitlements
+ 					custom_entitlements = os.path.join(project_dir,"Entitlements.plist")
+ 					entitlements_contents = None
+@@ -1464,6 +1479,24 @@
+ 				# END OF DISTRIBUTE COMMAND	
+ 				###########################################################################	
+ 
++				#
++				# this command is run for making a full simulator build with no
++				# local dependencies (i.e. no symlinks to app.js, etc.)
++				#
++				elif command == 'buildfull':
++					deploytype = "production"
++
++					args += [
++						"GCC_PREPROCESSOR_DEFINITIONS=DEPLOYTYPE=%s TI_PRODUCTION=1" % deploytype,
++						"DEPLOYMENT_POSTPROCESSING=YES",
++						"DEPLOYTYPE=production"
++					]
++					execute_xcode("iphonesimulator%s" % iphone_version,args,False)
++
++				###########################################################################	
++				# END OF BUILDFULL COMMAND
++				###########################################################################	
++
+ 			finally:
+ 				os.chdir(cwd)
+ 		except:
